@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Opinion.trade AI Analyzer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f5; color: #18181b; min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #71717a; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
+  .api-row { display: flex; gap: 8px; align-items: center; }
+  .api-row input { flex: 1; padding: 8px 12px; border: 1px solid #d4d4d8; border-radius: 8px; font-size: 13px; outline: none; }
+  .api-row input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+  .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-primary:hover { background: #4f46e5; }
+  .btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .filter-row input, .filter-row select { padding: 7px 10px; border: 1px solid #d4d4d8; border-radius: 8px; font-size: 13px; outline: none; }
+  .filter-row input { flex: 1; min-width: 160px; }
+  .market-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+  .market-item { background: #fafafa; border: 1px solid #e4e4e7; border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: all 0.15s; }
+  .market-item:hover { border-color: #a5b4fc; background: #f0f0ff; }
+  .market-item.active { border-color: #6366f1; background: #eef2ff; }
+  .market-title { font-size: 13px; font-weight: 500; margin-bottom: 6px; line-height: 1.4; }
+  .market-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: #71717a; }
+  .prob-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .prob-bar { flex: 1; height: 4px; background: #e4e4e7; border-radius: 2px; overflow: hidden; }
+  .prob-fill-yes { height: 100%; background: #22c55e; border-radius: 2px; transition: width 0.4s; }
+  .prob-pct { font-size: 11px; font-weight: 600; color: #16a34a; min-width: 32px; text-align: right; }
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat-box { background: #f4f4f5; border-radius: 8px; padding: 10px 12px; }
+  .stat-lbl { font-size: 11px; color: #71717a; margin-bottom: 3px; }
+  .stat-val { font-size: 18px; font-weight: 600; }
+  .analysis-panel { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 18px 20px; }
+  .analysis-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .analysis-header h2 { font-size: 15px; font-weight: 600; }
+  .verdict-box { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .chip { font-size: 13px; font-weight: 600; padding: 5px 14px; border-radius: 999px; }
+  .chip-yes { background: #dcfce7; color: #16a34a; }
+  .chip-no { background: #fee2e2; color: #dc2626; }
+  .chip-avoid { background: #fef9c3; color: #854d0e; }
+  .analysis-text { font-size: 13px; line-height: 1.8; color: #27272a; white-space: pre-wrap; }
+  .spinner { width: 16px; height: 16px; border: 2px solid #e4e4e7; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; color: #a1a1aa; font-size: 13px; padding: 30px; }
+  .err { font-size: 12px; color: #dc2626; background: #fee2e2; border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #e0e7ff; color: #4338ca; font-weight: 500; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:640px) { .split { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔮 Opinion.trade AI Analyzer</h1>
+  <p class="subtitle">Tải thị trường dự đoán • Chọn 1 thị trường • AI phân tích xác suất tức thì</p>
+
+  <div class="card">
+    <div class="api-row">
+      <input type="password" id="opinionKey" placeholder="Dán Opinion API Key vào đây..." />
+      <button class="btn btn-primary" id="loadBtn" onclick="loadMarkets()">Tải thị trường</button>
+    </div>
+    <div id="apiErr"></div>
+  </div>
+
+  <div class="split">
+    <!-- Left: danh sách thị trường -->
+    <div>
+      <div class="card" style="padding-bottom:12px;">
+        <div class="filter-row" id="filterRow" style="display:none">
+          <input type="text" id="searchInput" placeholder="Tìm kiếm..." oninput="renderList()" />
+          <select id="sortBy" onchange="loadMarkets()">
+            <option value="5">Volume 24h ↓</option>
+            <option value="1">Mới nhất</option>
+            <option value="3">Volume tổng ↓</option>
+          </select>
+          <span id="countLabel" style="font-size:12px;color:#71717a;"></span>
+        </div>
+        <div class="market-list" id="marketList">
+          <div class="empty">Nhập API Key để bắt đầu</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: phân tích -->
+    <div id="rightPanel" style="display:none">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="analysis-panel">
+        <div class="analysis-header">
+          <span id="aiSpinner"></span>
+          <h2 id="aiTitle">Phân tích AI</h2>
+        </div>
+        <div class="verdict-box" id="verdictBox" style="display:none"></div>
+        <div class="analysis-text" id="aiText">Đang phân tích...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let markets = [];
+let selectedId = null;
+let apiKey = '';
+let abortCtrl = null;
+
+function fmt(n) {
+  const v = parseFloat(n);
+  if (!n || isNaN(v)) return '—';
+  if (v >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
+  return '$' + v.toFixed(0);
+}
+
+async function loadMarkets() {
+  apiKey = document.getElementById('opinionKey').value.trim();
+  if (!apiKey) { showErr('Vui lòng nhập Opinion API Key'); return; }
+  const sortBy = document.getElementById('sortBy').value;
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true; btn.textContent = 'Đang tải...';
+  document.getElementById('apiErr').innerHTML = '';
+  document.getElementById('marketList').innerHTML = '<div class="empty"><span class="spinner"></span> Đang tải...</div>';
+
+  try {
+    const res = await fetch(`https://openapi.opinion.trade/openapi/market?status=activated&sortBy=${sortBy}&limit=50`, {
+      headers: { 'apikey': apiKey }
+    });
+    const data = await res.json();
+    if (data.code !== 0) throw new Error(data.msg || 'Lỗi API');
+    markets = data.result?.list || [];
+    document.getElementById('filterRow').style.display = 'flex';
+    document.getElementById('countLabel').textContent = markets.length + ' thị trường';
+    // Lấy giá YES cho 30 thị trường đầu
+    await fetchPrices(markets.slice(0, 30));
+    renderList();
+  } catch(e) {
+    showErr('Lỗi: ' + e.message);
+    document.getElementById('marketList').innerHTML = '<div class="empty">Không tải được dữ liệu</div>';
+  }
+  btn.disabled = false; btn.textContent = 'Tải thị trường';
+}
+
+async function fetchPrices(ms) {
+  await Promise.allSettled(ms.map(async m => {
+    if (!m.yesTokenId) return;
+    try {
+      const r = await fetch(`https://openapi.opinion.trade/openapi/token/latest-price?token_id=${m.yesTokenId}`, { headers: { 'apikey': apiKey } });
+      const d = await r.json();
+      if (d.code === 0 && d.result?.price) m._yesP = parseFloat(d.result.price);
+    } catch(_) {}
+  }));
+}
+
+function renderList() {
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const filtered = markets.filter(m => !q || (m.marketTitle||'').toLowerCase().includes(q));
+  const el = document.getElementById('marketList');
+  if (!filtered.length) { el.innerHTML = '<div class="empty">Không tìm thấy</div>'; return; }
+  el.innerHTML = filtered.map(m => {
+    const p = m._yesP != null ? (m._yesP * 100) : null;
+    const cutoff = m.cutoffAt ? new Date(m.cutoffAt*1000).toLocaleDateString('vi-VN') : '—';
+    const sel = selectedId === m.marketId;
+    return `<div class="market-item ${sel?'active':''}" onclick="selectMarket(${m.marketId})">
+      <div class="market-title">${m.marketTitle||'N/A'}</div>
+      <div class="market-meta">
+        <span>📊 ${fmt(m.volume24h)}</span>
+        <span>💰 ${fmt(m.volume)}</span>
+        <span>⏰ ${cutoff}</span>
+      </div>
+      ${p != null ? `<div class="prob-row"><span style="font-size:11px;color:#71717a">YES</span><div class="prob-bar"><div class="prob-fill-yes" style="width:${p.toFixed(0)}%"></div></div><span class="prob-pct">${p.toFixed(0)}%</span></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function selectMarket(id) {
+  selectedId = id;
+  renderList();
+  const m = markets.find(x => x.marketId === id);
+  if (!m) return;
+  document.getElementById('rightPanel').style.display = 'block';
+
+  const yesP = m._yesP != null ? (m._yesP*100).toFixed(1)+'%' : '—';
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-box"><div class="stat-lbl">YES xác suất</div><div class="stat-val" style="color:#16a34a">${yesP}</div></div>
+    <div class="stat-box"><div class="stat-lbl">Volume 24h</div><div class="stat-val">${fmt(m.volume24h)}</div></div>
+    <div class="stat-box"><div class="stat-lbl">Volume tổng</div><div class="stat-val">${fmt(m.volume)}</div></div>
+  `;
+
+  // Thu thập thêm dữ liệu
+  let ob = null, hist = null;
+  if (m.yesTokenId) {
+    try {
+      const [r1, r2] = await Promise.allSettled([
+        fetch(`https://openapi.opinion.trade/openapi/token/orderbook?token_id=${m.yesTokenId}`, { headers: { 'apikey': apiKey } }),
+        fetch(`https://openapi.opinion.trade/openapi/token/price-history?token_id=${m.yesTokenId}&interval=1d`, { headers: { 'apikey': apiKey } })
+      ]);
+      if (r1.status==='fulfilled') { const d=await r1.value.json(); if(d.code===0) ob=d.result; }
+      if (r2.status==='fulfilled') { const d=await r2.value.json(); if(d.code===0) hist=d.result; }
+    } catch(_) {}
+  }
+
+  analyzeWithAI(m, ob, hist);
+}
+
+async function analyzeWithAI(m, ob, hist) {
+  if (abortCtrl) abortCtrl.abort();
+  abortCtrl = new AbortController();
+
+  document.getElementById('aiSpinner').innerHTML = '<span class="spinner"></span>';
+  document.getElementById('aiTitle').textContent = 'AI đang phân tích...';
+  document.getElementById('verdictBox').style.display = 'none';
+  document.getElementById('aiText').textContent = '';
+
+  const yesP = m._yesP != null ? (m._yesP*100).toFixed(1) : 'N/A';
+  const cutoff = m.cutoffAt ? new Date(m.cutoffAt*1000).toLocaleDateString('vi-VN') : 'N/A';
+
+  let obTxt = '';
+  if (ob?.bids?.length || ob?.asks?.length) {
+    const bids = (ob.bids||[]).slice(0,4).map(b=>`${(parseFloat(b.price)*100).toFixed(1)}% (${parseFloat(b.size).toFixed(0)})`).join(', ');
+    const asks = (ob.asks||[]).slice(0,4).map(a=>`${(parseFloat(a.price)*100).toFixed(1)}% (${parseFloat(a.size).toFixed(0)})`).join(', ');
+    obTxt = `\nOrderbook YES - Mua: ${bids||'trống'} | Bán: ${asks||'trống'}`;
+  }
+
+  let histTxt = '';
+  if (hist?.history?.length) {
+    const pts = hist.history.slice(-10);
+    const trend = pts.map(p=>(parseFloat(p.p)*100).toFixed(0)+'%').join(' → ');
+    histTxt = `\nXu hướng giá 10 ngày: ${trend}`;
+  }
+
+  const prompt = `Bạn là chuyên gia phân tích thị trường dự đoán (prediction market). Phân tích thị trường sau và trả lời bằng tiếng Việt, ngắn gọn, súc tích.
+
+**Thị trường:** ${m.marketTitle}
+**Quy tắc:** ${m.rules || 'Không có chi tiết'}
+**Deadline:** ${cutoff}
+**Xác suất hiện tại (YES):** ${yesP}%
+**Volume 24h:** ${m.volume24h||'?'} | **Volume tổng:** ${m.volume||'?'}${obTxt}${histTxt}
+
+Phân tích theo cấu trúc sau:
+
+📌 **Tóm tắt:** Thị trường đang hỏi điều gì?
+
+📊 **Phân tích xác suất:** Dữ liệu orderbook và xu hướng giá nói lên điều gì? Thị trường đang nghiêng về phía nào?
+
+⚡ **Yếu tố ảnh hưởng:** 2-3 yếu tố chính tác động đến kết quả.
+
+🎯 **Khuyến nghị:** Xác suất YES theo bạn là bao nhiêu? YES hay NO?
+
+Bắt đầu phần khuyến nghị bằng dòng: VERDICT: YES [X%] hoặc VERDICT: NO [X%] hoặc VERDICT: TRÁNH`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        stream: true,
+        messages: [{ role: 'user', content: prompt }]
+      }),
+      signal: abortCtrl.signal
+    });
+
+    document.getElementById('aiSpinner').innerHTML = '';
+    document.getElementById('aiTitle').textContent = 'Phân tích AI';
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let full = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = dec.decode(value).split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (raw === '[DONE]') continue;
+        try {
+          const ev = JSON.parse(raw);
+          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+            full += ev.delta.text;
+            displayAnalysis(full, false);
+          }
+        } catch(_) {}
+      }
+    }
+    displayAnalysis(full, true);
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      document.getElementById('aiSpinner').innerHTML = '';
+      document.getElementById('aiText').textContent = 'Lỗi: ' + e.message;
+    }
+  }
+}
+
+function displayAnalysis(text, done) {
+  const vm = text.match(/VERDICT:\s*(YES|NO|TRÁNH)\s*\[?(\d+)?%?\]?/i);
+  if (vm) {
+    const side = vm[1].toUpperCase();
+    const pct = vm[2] ? vm[2]+'%' : '';
+    const cls = side==='YES' ? 'chip-yes' : side==='NO' ? 'chip-no' : 'chip-avoid';
+    document.getElementById('verdictBox').style.display = 'flex';
+    document.getElementById('verdictBox').innerHTML = `<span class="chip ${cls}">${side} ${pct}</span><span style="font-size:12px;color:#71717a">Khuyến nghị AI</span>`;
+  }
+  const clean = text.replace(/VERDICT:.*\n?/gi, '').trim();
+  document.getElementById('aiText').textContent = clean + (done ? '' : ' ▌');
+}
+
+function showErr(msg) {
+  document.getElementById('apiErr').innerHTML = `<div class="err">${msg}</div>`;
+}
+</script>
+</body>
+</html>
